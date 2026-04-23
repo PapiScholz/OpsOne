@@ -33,6 +33,12 @@ This file defines repository conventions for coding agents and automation contri
   - `README.md`
 - Add TODO markers in code/docs for incomplete implementation segments.
 
+### Roadmap Tracking Rule
+
+- `ROADMAP.md` must use Markdown tasklists for actionable roadmap items.
+- Completed roadmap items must be marked as `- [x] ~~Task text~~`.
+- Contributors must update roadmap checkbox status in the same change set where task status changes.
+
 ## Testing Rules
 
 - Add or update tests for behavior changes, not only syntax changes.
