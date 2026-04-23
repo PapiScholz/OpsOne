@@ -59,7 +59,15 @@ OpsOne 1.0 is a professional, local-first Windows operations product that delive
 
 ## 3. Phased Execution Roadmap to 1.0
 
+### Priority Legend
+
+- `P0` = 1.0 release-blocking work. Must be complete before `v1.0` GA.
+- `P1` = Important work that strengthens adoption/operability, but can be sequenced after core `P0` blockers if needed.
+- `P2` = Deliberately deferred work, primarily post-1.0 governance/expansion.
+
 ### Phase 1: Foundation Hardening
+
+**Priority:** `P0`
 
 **Objective**
 
@@ -91,6 +99,8 @@ Stabilize command/runtime contract, configuration behavior, and baseline safety 
 
 ### Phase 2: Triage Maturity
 
+**Priority:** `P0`
+
 **Objective**
 
 Move triage from baseline collection to reproducible, high-signal incident evidence capture.
@@ -120,6 +130,8 @@ Move triage from baseline collection to reproducible, high-signal incident evide
 - Performance regressions on low-resource endpoints.
 
 ### Phase 3: Prompt/Escalation Maturity
+
+**Priority:** `P0`
 
 **Objective**
 
@@ -151,6 +163,8 @@ Turn escalation into a controlled, reviewable bridge from local evidence to exte
 
 ### Phase 4: Tune Engine Maturity
 
+**Priority:** `P0`
+
 **Objective**
 
 Implement safe, auditable tune actions with dry-run-first and rollback-aware execution.
@@ -180,6 +194,8 @@ Implement safe, auditable tune actions with dry-run-first and rollback-aware exe
 - Rollback incompleteness for certain Windows settings.
 
 ### Phase 5: Repair Engine Maturity
+
+**Priority:** `P0`
 
 **Objective**
 
@@ -211,6 +227,8 @@ Implement repair routines as staged, evidence-backed workflows with strict opera
 
 ### Phase 6: Security Bridge Maturity
 
+**Priority:** `P0`
+
 **Objective**
 
 Expand security command from baseline snapshot into a robust posture bridge without claiming AV/EDR parity.
@@ -241,6 +259,8 @@ Expand security command from baseline snapshot into a robust posture bridge with
 
 ### Phase 7: Artifact Packaging and Bundle Integrity
 
+**Priority:** `P0`
+
 **Objective**
 
 Replace placeholder bundle flow with deterministic, integrity-verifiable packaging.
@@ -270,6 +290,8 @@ Replace placeholder bundle flow with deterministic, integrity-verifiable packagi
 
 ### Phase 8: UX and GUI/Desktop Shell
 
+**Priority:** `P1`
+
 **Objective**
 
 Introduce desktop shell that wraps CLI contracts and preserves safety model parity.
@@ -298,6 +320,8 @@ Introduce desktop shell that wraps CLI contracts and preserves safety model pari
 - Increased maintenance cost across languages/stacks.
 
 ### Phase 9: Distribution and Installation
+
+**Priority:** `P0`
 
 **Objective**
 
@@ -329,6 +353,8 @@ Move from repo-driven scripts to operator-friendly installation/update delivery.
 
 ### Phase 10: Code Signing and Trust Chain
 
+**Priority:** `P0`
+
 **Objective**
 
 Establish verifiable authenticity for scripts/binaries/packages and published releases.
@@ -358,6 +384,8 @@ Establish verifiable authenticity for scripts/binaries/packages and published re
 - False assurance if verification workflow is unclear.
 
 ### Phase 11: Testing and Quality Gates
+
+**Priority:** `P0`
 
 **Objective**
 
@@ -389,6 +417,8 @@ Create release-blocking quality system aligned with safety and contract stabilit
 - Slow test pipelines reducing contributor velocity.
 
 ### Phase 12: Docs and Operator Guidance
+
+**Priority:** `P0`
 
 **Objective**
 
@@ -424,6 +454,8 @@ Publish complete operator-facing and contributor-facing documentation for 1.0 re
 
 ### Phase 13: Extensibility/Module System
 
+**Priority:** `P1`
+
 **Objective**
 
 Enable controlled extensibility without breaking core trust guarantees.
@@ -452,6 +484,8 @@ Enable controlled extensibility without breaking core trust guarantees.
 - API surface instability for extension authors.
 
 ### Phase 14: Release Engineering
+
+**Priority:** `P0`
 
 **Objective**
 
@@ -482,6 +516,8 @@ Build repeatable release process with traceable versioning and governance.
 
 ### Phase 15: Post-1.0 Considerations
 
+**Priority:** `P2`
+
 **Objective**
 
 Maintain disciplined growth after 1.0 without violating trust boundaries.
@@ -509,6 +545,8 @@ Maintain disciplined growth after 1.0 without violating trust boundaries.
 - Maintenance overload across PowerShell + Go + desktop layers.
 
 ## 4. Versioned Milestones (Release-Blocking Scope Only)
+
+Milestone gating rule: `v1.0` GA is gated by completion of `P0` roadmap phases; `P1` and `P2` items are intentionally non-blocking unless explicitly promoted.
 
 ### v0.1 (Current Baseline)
 
