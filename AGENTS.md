@@ -38,6 +38,11 @@ This file defines repository conventions for coding agents and automation contri
 - Add or update tests for behavior changes, not only syntax changes.
 - Prefer fast unit tests for parser and contract logic.
 - Use integration tests for end-to-end command behavior.
+- Keep tests compatible with the default Windows baseline in this repo (Windows PowerShell + legacy Pester syntax) unless a version bump is explicitly introduced.
+
+## Execution Lessons
+
+- When loading PowerShell modules/scripts that define functions needed by the caller, dot-source them in the current execution scope (not inside an isolated helper scope) to avoid missing-command runtime failures.
 
 ## Security and Safety Rules
 
@@ -52,4 +57,3 @@ This file defines repository conventions for coding agents and automation contri
 - List any TODOs intentionally left unresolved.
 - Call out safety-impacting changes.
 - Include doc updates in the same change set when applicable.
-
