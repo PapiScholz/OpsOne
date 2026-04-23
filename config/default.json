@@ -1,0 +1,24 @@
+{
+  "runRoot": "runs",
+  "timezone": "UTC",
+  "logLevel": "Info",
+  "retentionDays": 30,
+  "safety": {
+    "requireConfirmationForChanges": true,
+    "allowDestructiveActions": false,
+    "defaultDryRun": true
+  },
+  "collectors": {
+    "triageQuickTimeoutSeconds": 60,
+    "triageFullTimeoutSeconds": 180
+  },
+  "escalation": {
+    "defaultProvider": "chatgpt",
+    "allowedProviders": [
+      "chatgpt",
+      "gemini",
+      "claude"
+    ]
+  }
+}
+

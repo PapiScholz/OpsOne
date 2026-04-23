@@ -1,0 +1,28 @@
+name: release-placeholder
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag (e.g., v0.1.0)"
+        required: true
+        type: string
+
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run packaging placeholder
+        shell: pwsh
+        run: |
+          ./packaging/package.ps1 -Version "${{ inputs.version }}"
+
+      - name: Upload placeholder artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: opsone-package-placeholder-${{ inputs.version }}
+          path: dist/**
+

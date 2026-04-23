@@ -1,0 +1,19 @@
+# Build and runtime outputs
+runs/
+dist/
+artifacts/
+
+# PowerShell / tooling
+*.log
+*.tmp
+*.cache
+TestResults/
+
+# Editors
+.idea/
+*.code-workspace
+
+# OS noise
+Thumbs.db
+Desktop.ini
+
