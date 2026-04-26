@@ -4,13 +4,17 @@
 
 ### End-State Definition
 
-OpsOne 1.0 is a professional, local-first Windows operations product that delivers reproducible triage, safe tuning, common repairs, security posture visibility, and escalation-ready evidence packages without silent system changes.
+OpsOne is a local-first Windows endpoint doctor for IT and SecOps teams. It collects evidence, checks security posture, scores suspicious or unhealthy conditions with explainable heuristics, suggests safe repairs, and generates escalation-ready reports and LLM prompts without acting as an antivirus, EDR, SIEM, or remote-control agent.
+
+**Short positioning:** OpsOne — local-first Windows triage, safe repair, heuristic scoring, and evidence-based escalation.
 
 ### What "Professional Product" Means for OpsOne
 
-- [ ] Deliver a stable, documented command contract for `triage`, `tune`, `repair`, `security`, and `escalate`.
+- [ ] Deliver a stable, documented command contract for `triage`, `tune`, `repair`, `security`, `escalate`, `score`, and `doctor`.
 - [ ] Enforce explicit operator intent for any state-changing action.
 - [ ] Produce deterministic, integrity-verifiable artifact bundles suitable for analyst handoff.
+- [ ] Deliver a heuristic scoring engine that produces explainable, evidence-linked findings with risk and confidence scores.
+- [ ] Support optional external knowledge base enrichment as explicit opt-in only, with no default outbound calls.
 - [ ] Ship with installer-grade packaging, code signing, versioned release process, and rollback-aware updates.
 - [ ] Maintain test and documentation quality gates that block unsafe or contract-breaking changes.
 
@@ -26,8 +30,44 @@ OpsOne 1.0 is a professional, local-first Windows operations product that delive
 - [ ] Safe-by-default actions: dry-run and confirmation controls where state can change.
 - [ ] Transparent outputs: structured artifacts, logs, and explicit error surfaces.
 - [ ] Clear product boundaries: not AV, not EDR, not remote control software.
+- [ ] Heuristic findings are evidence-first: no verdicts without supporting artifact data.
+- [ ] External enrichment is opt-in: no default network calls to external APIs.
+- [ ] Enrichment may adjust confidence but cannot replace local evidence as the finding basis.
 
-## 2. Explicit Current State (Implemented vs Scaffold vs Limitations)
+## 2. Competitive Positioning
+
+### What OpsOne Competes On
+
+OpsOne competes as a **Windows endpoint triage and escalation workflow tool**, not as a malware file analyzer.
+
+Tools that explain suspicious files (sandbox analyzers, hash-reputation lookup tools) solve a different problem: they start from a suspect file and ask "what does this do?"
+
+OpsOne starts from a sick Windows endpoint and asks "what is wrong here, is it safe to fix, and what should I tell my analyst?"
+
+OpsOne wins through:
+
+- **Local endpoint evidence** — all signals come from the running system, not uploaded samples.
+- **Explainable heuristics** — risk and confidence scores with traceable evidence sources.
+- **Safe repair suggestions** — dry-run-first, confirm-before-change, rollback-aware.
+- **Optional external enrichment** — hash/IP/domain reputation checks as explicit opt-in only.
+- **Escalation-ready packaging** — deterministic, integrity-verifiable bundles for analyst handoff.
+- **Strict local-first and operator-control guarantees** — no silent changes, no automatic external transmission.
+
+### What OpsOne Does Not Compete As
+
+- Not an antivirus or malware signature scanner.
+- Not an EDR or SIEM platform.
+- Not a remote management or command-and-control agent.
+- Not a browser-upload sandbox analyzer.
+- Not a silent optimizer that changes systems without operator intent.
+
+### UX Inspiration (Not Functional Scope)
+
+File analyzer tools provide useful UX patterns: simple entry point, fast value, clear output, optional AI explanation.
+
+OpsOne borrows those UX principles for endpoint workflows but does not replicate file-analysis or cloud-upload scope.
+
+## 3. Explicit Current State (Implemented vs Scaffold vs Limitations)
 
 ### Implemented in Repository Today
 
@@ -48,6 +88,8 @@ OpsOne 1.0 is a professional, local-first Windows operations product that delive
 - [ ] Go helper area is placeholder (`internal/go-helper/README.md`) with no implemented helper binaries.
 - [ ] Artifact schemas under `schemas/artifacts` are placeholder-grade and not enforced as stable contracts.
 - [ ] Redaction workflow for escalation artifacts is not implemented.
+- [ ] Heuristic scoring engine is not yet implemented.
+- [ ] `opsone doctor`, `opsone score`, and `opsone enrich` commands are not yet implemented.
 
 ### Current Limitations
 
@@ -57,7 +99,7 @@ OpsOne 1.0 is a professional, local-first Windows operations product that delive
 - [ ] Signed bundles and signed executable distribution are not implemented.
 - [ ] Installer-grade distribution path (including winget) is not implemented.
 
-## 3. Phased Execution Roadmap to 1.0
+## 4. Phased Execution Roadmap to 1.0
 
 ### Priority Legend
 
@@ -129,13 +171,108 @@ Move triage from baseline collection to reproducible, high-signal incident evide
 - False confidence if heuristic hints are interpreted as verdicts.
 - Performance regressions on low-resource endpoints.
 
-### Phase 3: Prompt/Escalation Maturity
+### Phase 3: Heuristic Engine MVP
 
 **Priority:** `P0`
 
 **Objective**
 
-Turn escalation into a controlled, reviewable bridge from local evidence to external analyst/LLM workflows.
+Build a local scoring engine that evaluates collected triage artifacts and produces explainable, evidence-linked findings. No internet required. The operator decides all next steps.
+
+**Core Rule**
+
+> Local evidence detects. External knowledge bases enrich. The operator decides.
+
+**Scoring Model**
+
+- `risk`: 0–100 — observed danger level based on evidence weight.
+- `confidence`: 0–100 — certainty of the rule conclusion from available evidence.
+- `severity`: `informational` | `low` | `medium` | `high` | `critical`
+- Risk and confidence are always separate fields. They must never be conflated.
+
+**Finding Schema**
+
+Each finding must include: `finding_id`, `title`, `category`, `severity`, `risk`, `confidence`, `evidence[]` (source, field, value), `rule_id`, `safe_next_steps[]`, and optional `safe_command`.
+
+Example:
+
+```json
+{
+  "finding_id": "defender_realtime_disabled",
+  "title": "Microsoft Defender real-time protection appears disabled",
+  "category": "defender_health",
+  "severity": "high",
+  "risk": 80,
+  "confidence": 90,
+  "evidence": [
+    { "source": "Get-MpComputerStatus", "field": "RealTimeProtectionEnabled", "value": false }
+  ],
+  "rule_id": "DEFENDER-REALTIME-OFF",
+  "safe_next_steps": [
+    "Review Defender health status",
+    "Run Defender repair in dry-run mode",
+    "Escalate with generated evidence package if service cannot be restored"
+  ],
+  "safe_command": "opsone repair defender --safe --dry-run"
+}
+```
+
+**MVP Rule Categories (Prioritized)**
+
+Initial implementation targets these categories first:
+
+- `defender_health` — Defender real-time protection, definition age, service state.
+- `persistence` — suspicious scheduled tasks, services, autorun entries.
+- `process_anomaly` — unusual process names, unsigned binaries, unexpected parent processes.
+- `security_posture` — SmartScreen, BitLocker, ASR, firewall baseline state.
+- `evidence_quality` — collector failures, partial evidence gaps, privilege limitations.
+
+Post-MVP expansion (not promised for v0.3):
+
+- `network_activity` — local connection evidence: unusual outbound ports, unexpected listeners.
+- `startup_bloat` — excessive startup item count, known-unnecessary autorun entries.
+- `system_health` — disk pressure, memory pressure, event log errors.
+
+**Deliverables**
+
+- [ ] Define rule schema (YAML or JSON) with: `rule_id`, `category`, condition expression, `severity`, `risk_weight`, `confidence_weight`, `safe_next_steps`.
+- [ ] Implement rule loader/parser in `src/core/` or new `src/scoring/` module.
+- [ ] Implement scoring engine that maps triage artifacts to findings JSON.
+- [ ] Produce structured JSON findings (`findings.json`) and human-readable Markdown summary per run.
+- [ ] Implement initial rules for MVP categories above.
+- [ ] Add `opsone triage --score` flag to run triage followed immediately by scoring.
+- [ ] Add `opsone score --case <run-id>` command to re-score an existing run without re-collecting.
+- [ ] Add `opsone doctor` command as the primary operator entry point (see Section 6).
+- [ ] Ensure engine is fully usable with no internet connection.
+- [ ] Avoid malware-verdict language unless evidence explicitly supports it.
+- [ ] Avoid automatic or destructive remediation from scoring output.
+
+**Exit Criteria**
+
+- `opsone doctor` runs end-to-end without network: collects evidence, scores, produces health summary, creates escalation package.
+- Finding schema validates in CI.
+- All findings include evidence source traceability.
+- No external network call is made by default.
+- Scoring rules are independently loadable and testable in isolation.
+
+**Dependencies**
+
+- Triage artifact consistency (Phase 2).
+- Foundation contract versioning (Phase 1).
+
+**Notable Risks**
+
+- False-positive findings eroding operator trust if thresholds are too aggressive.
+- Rule complexity creep — initial rules must be simple and explicitly scoped.
+- Score interpretation risk if risk/confidence semantics are not clearly documented.
+
+### Phase 4: Prompt / Escalation Maturity
+
+**Priority:** `P0`
+
+**Objective**
+
+Turn escalation into a controlled, reviewable bridge from local evidence and heuristic findings to external analyst/LLM workflows.
 
 **Deliverables**
 
@@ -144,24 +281,109 @@ Turn escalation into a controlled, reviewable bridge from local evidence to exte
 - [ ] Add provider-specific token budgeting guidance and prompt profile variants.
 - [ ] Version prompt templates and maintain prompt changelog in docs.
 - [ ] Add operator review checklist artifact that must be acknowledged before external sharing.
+- [ ] Add `--include-score` flag to embed structured findings in generated prompts.
+- [ ] Add `--include-enrichment` flag to embed enrichment results in prompts (post-Phase 5).
+- [ ] Prompts must separate confirmed local evidence from enrichment-derived context.
+- [ ] Prompts must not invent findings not present in scoring artifacts.
+- [ ] Prompts must suggest safe, reversible next steps first.
 
 **Exit Criteria**
 
 - Escalation can reference a prior run deterministically.
 - Redaction path is available and documented.
 - Prompt outputs include traceable template/version metadata.
+- Prompts consuming findings reference finding IDs and evidence sources.
 
 **Dependencies**
 
 - Triage artifact consistency.
-- Safety model expansion.
+- Heuristic Engine MVP (Phase 3) for finding-aware escalation.
 
 **Notable Risks**
 
 - Privacy/legal exposure if redaction is incomplete.
 - Provider drift causing prompt behavior changes.
+- Prompts fabricating evidence if not grounded in artifact data.
 
-### Phase 4: Tune Engine Maturity
+### Phase 5: Knowledge Base Enrichment MVP
+
+**Priority:** `P0`
+
+**Objective**
+
+Provide optional evidence enrichment from offline knowledge bases (no network required) and opt-in online reputation services (explicit operator request only). Offline KB is allowed by default. Online enrichment is never enabled by default.
+
+**Core Enrichment Rule**
+
+> External enrichment can annotate or adjust confidence only when a local finding already exists. It must not create standalone security findings by itself in MVP.
+
+**Hard Safety Requirements**
+
+- No external API calls by default — ever.
+- No file uploads by default. Sample upload is out of MVP scope; if added post-1.0, it requires `--allow-upload` flag and explicit confirmation.
+- VirusTotal: hash-only by default. File upload support is post-1.0 or experimental only.
+- Missing API keys must produce clean degraded warnings, not crashes.
+- External reputation may raise or lower confidence but cannot be the sole basis for a finding.
+- All external lookups must be logged in the artifact bundle.
+- Redaction and operator review are required before sharing enrichment artifacts externally.
+
+**Offline / Local Knowledge Bases (No API Key Required)**
+
+- [ ] LOLBAS — abused legitimate Windows binaries reference (bundled local JSON).
+- [ ] MITRE ATT&CK — offline technique mapping for persistence/process findings.
+- [ ] SigmaHQ references — offline detection pattern guidance.
+- [ ] Windows Event ID reference — offline event interpretation support.
+
+**Online Enrichment (Explicit Opt-In, API Key Required)**
+
+- [ ] VirusTotal — hash/IP/domain reputation (hash-only by default).
+- [ ] AbuseIPDB — IP reputation for observed network connections.
+- [ ] URLhaus — malicious URL/domain matching.
+- [ ] MalwareBazaar — hash reputation.
+
+Note: `network_reputation` context from online enrichment annotates existing `network_activity` findings only. It does not produce independent findings in MVP.
+
+**CLI Surface**
+
+- `opsone enrich --source virustotal --hash-only`
+- `opsone enrich --source abuseipdb`
+- `opsone triage --with-reputation --hash-only`
+- `opsone score --case latest --with-enrichment`
+- `opsone escalate --provider chatgpt --include-score --include-enrichment`
+
+**Deliverables**
+
+- [ ] Implement offline KB loader for LOLBAS, MITRE ATT&CK, Sigma, and Event ID references.
+- [ ] Bundle offline KBs as local data files; never fetched at runtime.
+- [ ] Implement enrichment provider interface: name, lookup type, required key, opt-in flag, timeout, error handling.
+- [ ] Implement VirusTotal hash-only enrichment provider (no uploads by default).
+- [ ] Implement AbuseIPDB IP reputation provider.
+- [ ] Add API key config support (environment variables or config file; never hardcoded).
+- [ ] Add missing-key warning path: clean degraded output, no crash.
+- [ ] Log all external lookups in artifact bundle.
+- [ ] Implement `opsone enrich` command.
+- [ ] Mark all enrichment results as `external/unverified` in output artifacts.
+
+**Exit Criteria**
+
+- Running without API keys produces clean warnings and no crashes.
+- Running without network produces clean offline-only mode.
+- Enrichment results are never transmitted externally without explicit operator action.
+- All external lookups appear in artifact log.
+- Offline KBs load and annotate findings without any network call.
+
+**Dependencies**
+
+- Heuristic Engine finding schema (Phase 3).
+- Foundation artifact contracts (Phase 1).
+
+**Notable Risks**
+
+- API rate limits and key management complexity.
+- False confidence if enrichment results are treated as ground truth rather than annotations.
+- Privacy risk if hashes or IPs reach external services without explicit consent.
+
+### Phase 6: Tune Engine Maturity
 
 **Priority:** `P0`
 
@@ -193,7 +415,7 @@ Implement safe, auditable tune actions with dry-run-first and rollback-aware exe
 - Unintended performance side effects.
 - Rollback incompleteness for certain Windows settings.
 
-### Phase 5: Repair Engine Maturity
+### Phase 7: Repair Engine Maturity
 
 **Priority:** `P0`
 
@@ -225,7 +447,7 @@ Implement repair routines as staged, evidence-backed workflows with strict opera
 - Repair commands can impact system stability if prerequisites are weak.
 - Privilege variance across Windows editions/users.
 
-### Phase 6: Security Bridge Maturity
+### Phase 8: Security Bridge Maturity
 
 **Priority:** `P0`
 
@@ -257,7 +479,7 @@ Expand security command from baseline snapshot into a robust posture bridge with
 - Defender/API availability varies significantly by host policy/version.
 - Over-scoping into detection promises.
 
-### Phase 7: Artifact Packaging and Bundle Integrity
+### Phase 9: Artifact Packaging and Bundle Integrity
 
 **Priority:** `P0`
 
@@ -288,7 +510,7 @@ Replace placeholder bundle flow with deterministic, integrity-verifiable packagi
 - Non-determinism from file timestamp/ordering behavior.
 - Hash/manifest drift during refactors.
 
-### Phase 8: UX and GUI/Desktop Shell
+### Phase 10: UX and GUI / Desktop Shell
 
 **Priority:** `P1`
 
@@ -319,7 +541,7 @@ Introduce desktop shell that wraps CLI contracts and preserves safety model pari
 - Divergence between GUI wrappers and CLI behavior.
 - Increased maintenance cost across languages/stacks.
 
-### Phase 9: Distribution and Installation
+### Phase 11: Distribution and Installation
 
 **Priority:** `P0`
 
@@ -351,7 +573,7 @@ Move from repo-driven scripts to operator-friendly installation/update delivery.
 - Installer complexity on Windows variants.
 - Upgrade regressions affecting trust.
 
-### Phase 10: Code Signing and Trust Chain
+### Phase 12: Code Signing and Trust Chain
 
 **Priority:** `P0`
 
@@ -383,7 +605,7 @@ Establish verifiable authenticity for scripts/binaries/packages and published re
 - Key management and operational overhead.
 - False assurance if verification workflow is unclear.
 
-### Phase 11: Testing and Quality Gates
+### Phase 13: Testing and Quality Gates
 
 **Priority:** `P0`
 
@@ -394,12 +616,14 @@ Create release-blocking quality system aligned with safety and contract stabilit
 **Deliverables**
 
 - [ ] Expand unit tests for parsers, config, output contract constructors, and safety helpers.
-- [ ] Expand integration tests for command flows (`triage`, `security`, `escalate`, `tune`, `repair`).
+- [ ] Expand integration tests for command flows (`triage`, `security`, `escalate`, `tune`, `repair`, `score`, `doctor`).
 - [ ] Add golden-output tests for stable artifacts and summary/prompt generation.
 - [ ] Add schema/contract validation tests for all produced artifacts.
 - [ ] Add privilege-sensitive test matrix (standard user vs elevated contexts).
 - [ ] Add packaging validation tests (artifact completeness, signatures, manifest integrity).
 - [ ] Add regression suite for known bug classes and historical incidents.
+- [ ] Add heuristic engine tests: rule parsing, scoring thresholds, missing-collector-data degradation.
+- [ ] Add enrichment tests: API failure handling, no-network mode, missing API key warnings, hash-only mode.
 
 **Exit Criteria**
 
@@ -416,7 +640,7 @@ Create release-blocking quality system aligned with safety and contract stabilit
 - Flaky Windows environment behavior in CI.
 - Slow test pipelines reducing contributor velocity.
 
-### Phase 12: Docs and Operator Guidance
+### Phase 14: Docs and Operator Guidance
 
 **Priority:** `P0`
 
@@ -430,18 +654,22 @@ Publish complete operator-facing and contributor-facing documentation for 1.0 re
 - [ ] Update command docs with mature options, outputs, and safety semantics.
 - [ ] Finalize module spec with contract guarantees and boundary rules.
 - [ ] Finalize prompts docs with versioning/redaction/token-budget guidance.
-- [ ] Finalize troubleshooting playbook for collector failures and privilege variance.
+- [ ] Finalize troubleshooting playbook for collector failures, privilege variance, and enrichment API failures.
 - [ ] Add FAQ for common operator and security team concerns.
-- [ ] Add operator playbooks for triage-first and repair/escalation workflows.
+- [ ] Add operator playbooks for triage-first, doctor, repair/escalation workflows.
 - [ ] Add release process doc with build, signing, validation, rollback steps.
 - [ ] Add trust model doc with guarantees, limits, and anti-goals.
-- [ ] Keep contribution guidance aligned with quality/safety gates.
+- [ ] Add heuristic scoring model doc: risk/confidence semantics, severity definitions.
+- [ ] Add rule authoring guide: rule schema, categories, testing new rules.
+- [ ] Add enrichment privacy model doc: what is sent, to whom, when, and how to audit.
+- [ ] Add example doctor workflow doc: doctor → review → repair dry-run → escalate with score.
+- [ ] Keep contribution guidance aligned (`CONTRIBUTING.md`, `AGENTS.md`).
 
 **Exit Criteria**
 
 - No major command/safety behavior undocumented.
 - Docs reflect actual implementation, not intended scaffolding.
-- Operators can run core workflows end-to-end from docs.
+- Operators can run core workflows end-to-end from docs alone.
 
 **Dependencies**
 
@@ -452,7 +680,7 @@ Publish complete operator-facing and contributor-facing documentation for 1.0 re
 - Documentation drift during late feature work.
 - Under-specified trust limitations causing misuse.
 
-### Phase 13: Extensibility/Module System
+### Phase 15: Extensibility / Module System
 
 **Priority:** `P1`
 
@@ -483,7 +711,7 @@ Enable controlled extensibility without breaking core trust guarantees.
 - Unsafe extensions weakening product trust.
 - API surface instability for extension authors.
 
-### Phase 14: Release Engineering
+### Phase 16: Release Engineering
 
 **Priority:** `P0`
 
@@ -514,7 +742,7 @@ Build repeatable release process with traceable versioning and governance.
 - Pipeline fragility delaying critical fixes.
 - Inconsistent release metadata harming trust.
 
-### Phase 15: Post-1.0 Considerations
+### Phase 17: Post-1.0 Considerations
 
 **Priority:** `P2`
 
@@ -544,7 +772,7 @@ Maintain disciplined growth after 1.0 without violating trust boundaries.
 - Pressure to add unsafe automation.
 - Maintenance overload across PowerShell + Go + desktop layers.
 
-## 4. Versioned Milestones (Release-Blocking Scope Only)
+## 5. Versioned Milestones (Release-Blocking Scope Only)
 
 Milestone gating rule: `v1.0` GA is gated by completion of `P0` roadmap phases; `P1` and `P2` items are intentionally non-blocking unless explicitly promoted.
 
@@ -572,9 +800,9 @@ Milestone gating rule: `v1.0` GA is gated by completion of `P0` roadmap phases; 
 
 **What Must Exist**
 
-- [ ] Foundation hardening deliverables completed.
-- [ ] Triage diagnostics/fallback behavior materially improved.
-- [ ] Explicit contract versioning introduced in outputs/docs.
+- [ ] Foundation hardening deliverables completed (Phase 1).
+- [ ] Triage diagnostics/fallback behavior materially improved (Phase 2).
+- [ ] Explicit contract versioning introduced in outputs and docs.
 - [ ] Initial schema validation tests in CI.
 
 **What Must Be Stable**
@@ -584,6 +812,7 @@ Milestone gating rule: `v1.0` GA is gated by completion of `P0` roadmap phases; 
 
 **Intentionally Out of Scope**
 
+- [ ] Heuristic scoring engine.
 - [ ] Desktop shell implementation.
 - [ ] Full packaging/signing pipeline.
 
@@ -591,33 +820,80 @@ Milestone gating rule: `v1.0` GA is gated by completion of `P0` roadmap phases; 
 
 **What Must Exist**
 
-- [ ] Prompt/escalation run-reference loading and redaction baseline.
-- [ ] Deterministic bundle/manifest/hash MVP.
-- [ ] Tune and repair engines moved beyond scaffold to controlled execution MVP.
+- [ ] Heuristic Engine MVP: rule schema, scoring engine, finding JSON and Markdown output (Phase 3).
+- [ ] `opsone doctor` command: quick/safe collection → score → health summary → escalation package.
+- [ ] `opsone score --case <run-id>` command available.
+- [ ] `opsone triage --score` flag available.
+- [ ] MVP rule categories implemented: `defender_health`, `persistence`, `process_anomaly`, `security_posture`, `evidence_quality`.
+- [ ] Finding schema validates in CI.
+- [ ] Offline KB bundles (LOLBAS, MITRE ATT&CK, Sigma, Event IDs) included in distribution.
+
+**What Must Be Stable**
+
+- [ ] Finding schema fields and version.
+- [ ] `doctor` command output shape and behavior (no state mutation).
+
+**Intentionally Out of Scope**
+
+- [ ] Online enrichment (VirusTotal, AbuseIPDB, URLhaus, MalwareBazaar).
+- [ ] `opsone enrich` command.
+- [ ] Winget-grade delivery.
+- [ ] Full desktop parity with CLI.
+
+### v0.4
+
+**What Must Exist**
+
+- [ ] Online enrichment MVP: VirusTotal hash-only, AbuseIPDB (Phase 5).
+- [ ] `opsone enrich` command available.
+- [ ] API key config via environment variables or config file.
+- [ ] Missing API key path produces clean warnings, not crashes.
+- [ ] All external lookups logged in artifact bundle.
+- [ ] No-network mode produces clean offline-only output.
+
+**What Must Be Stable**
+
+- [ ] Enrichment safety model: offline by default, online opt-in only.
+- [ ] Enrichment annotates existing findings only; does not create standalone findings.
+
+**Intentionally Out of Scope**
+
+- [ ] File/sample upload to external services.
+- [ ] Full escalation maturity with `--include-enrichment`.
+
+### v0.5
+
+**What Must Exist**
+
+- [ ] Prompt/escalation run-reference loading and redaction baseline (Phase 4).
+- [ ] `--include-score` flag for escalation prompts consuming structured findings.
+- [ ] Deterministic bundle/manifest/hash MVP (Phase 9 begin).
+- [ ] Tune and repair engines moved beyond scaffold to controlled execution MVP (Phases 6, 7).
 
 **What Must Be Stable**
 
 - [ ] Escalation safety workflow (review-before-share path).
 - [ ] Artifact manifest format v1.
+- [ ] Safety gates for state-changing tune/repair commands.
 
 **Intentionally Out of Scope**
 
 - [ ] Winget-grade delivery.
 - [ ] Full desktop parity with CLI.
 
-### v0.5
+### v0.6
 
 **What Must Exist**
 
-- [ ] Mature tune action engine with rollback metadata.
-- [ ] Mature repair routine engine with pre/post evidence and command output capture.
-- [ ] Security bridge expanded beyond Defender/firewall baseline.
-- [ ] Test suite includes unit/integration/golden/contract coverage for core flows.
+- [ ] Security bridge expanded beyond Defender/firewall baseline (Phase 8).
+- [ ] Capability detection and unsupported-state reporting.
+- [ ] Fact-vs-recommendation separation in security outputs.
+- [ ] Test suite includes unit/integration/golden/contract coverage for core flows (Phase 13 begin).
 
 **What Must Be Stable**
 
-- [ ] Safety gates for state-changing commands.
 - [ ] Command output contract and artifact schemas for core artifacts.
+- [ ] Security command output shape with posture facts and recommendations.
 
 **Intentionally Out of Scope**
 
@@ -627,10 +903,10 @@ Milestone gating rule: `v1.0` GA is gated by completion of `P0` roadmap phases; 
 
 **What Must Exist**
 
-- [ ] Portable package and bootstrap installer path implemented.
-- [ ] Release pipeline no longer placeholder.
-- [ ] Signature/checksum verification workflow integrated at least for release artifacts.
-- [ ] Desktop shell MVP for triage + artifact review.
+- [ ] Portable package and bootstrap installer path implemented (Phase 11).
+- [ ] Release pipeline no longer placeholder (Phase 16 begin).
+- [ ] Signature/checksum verification workflow integrated at least for release artifacts (Phase 12 begin).
+- [ ] Desktop shell MVP for triage + artifact review (Phase 10 begin).
 
 **What Must Be Stable**
 
@@ -645,9 +921,9 @@ Milestone gating rule: `v1.0` GA is gated by completion of `P0` roadmap phases; 
 
 **What Must Exist**
 
-- [ ] 1.0 documentation set drafted and reviewed.
-- [ ] Full quality gates and regression matrix active.
-- [ ] Code-signing trust chain operational.
+- [ ] 1.0 documentation set drafted and reviewed (Phase 14).
+- [ ] Full quality gates and regression matrix active (Phase 13).
+- [ ] Code-signing trust chain operational (Phase 12).
 - [ ] Privilege-sensitive test matrix and Windows baseline matrix defined.
 
 **What Must Be Stable**
@@ -665,6 +941,9 @@ Milestone gating rule: `v1.0` GA is gated by completion of `P0` roadmap phases; 
 
 - [ ] All release-blocking phases complete for CLI professional baseline.
 - [ ] Deterministic, integrity-verifiable escalation package flow.
+- [ ] Heuristic scoring engine stable with documented rule schema and finding contract.
+- [ ] External enrichment safety model enforced: offline by default, online opt-in only.
+- [ ] `opsone doctor` command runs end-to-end without network access.
 - [ ] Installer-grade and signed distribution path documented and supported.
 - [ ] Comprehensive docs and operator playbooks published.
 - [ ] Formal trust model and maintenance model published.
@@ -674,14 +953,98 @@ Milestone gating rule: `v1.0` GA is gated by completion of `P0` roadmap phases; 
 - [ ] Command behavior and contracts suitable for downstream automation.
 - [ ] Safety guarantees and review controls for state changes and external sharing.
 - [ ] Release engineering and quality gate process.
+- [ ] Heuristic finding schema as a stable versioned contract.
 
 **Intentionally Out of Scope**
 
 - [ ] AV/EDR replacement capabilities.
 - [ ] Remote management/orchestration agent behavior.
 - [ ] Silent autonomous optimization without operator intent.
+- [ ] File/sample upload to external services.
 
-## 5. Command-by-Command Maturity Path
+## 6. Command-by-Command Maturity Path
+
+### `doctor`
+
+**Current State**
+
+- [ ] Not yet implemented. Roadmap target for v0.3.
+
+**Purpose**
+
+Primary operator entry point for endpoint health assessment. Composites safe evidence collection, heuristic scoring, escalation packaging, and LLM prompt generation into a single non-destructive workflow.
+
+**Default Behavior (all steps non-destructive)**
+
+1. Collects safe local evidence — default: quick/safe collection mode.
+2. Runs heuristic scoring over collected evidence.
+3. Produces health summary: overall label, finding count, severity breakdown.
+4. Suggests safe next steps (repair dry-run commands, escalation packaging).
+5. Creates escalation package (ZIP bundle: artifacts + findings + manifest).
+6. Generates LLM-ready prompts referencing structured findings.
+7. Makes no destructive change.
+
+**Planned Flags**
+
+- `--full` — use full evidence collection instead of quick/safe default.
+- `--with-reputation --hash-only` — include opt-in online enrichment pass.
+- `--provider <name>` — include provider-specific LLM prompt in run output.
+
+**Expected Output Shape**
+
+```
+OpsOne Doctor completed.
+
+Health:     Warning
+Findings:   4 (1 high, 2 medium, 1 informational)
+Repairs:    2 available (dry-run only)
+Enrichment: Not run  (use --with-reputation to enable)
+Package:    ./cases/2026-04-25T16-30-00/opsone-case.zip
+LLM prompt: ./cases/2026-04-25T16-30-00/prompts/chatgpt-escalation.md
+
+Recommended next step:
+  .\opsone.ps1 escalate --provider chatgpt --include-score
+```
+
+**Safety Requirements**
+
+- [ ] No state mutation in any doctor code path.
+- [ ] All outputs are reviewable local artifacts, not automatic external submissions.
+- [ ] Doctor is a composite of existing safe commands — not a shortcut around safety gates.
+
+### `score`
+
+**Current State**
+
+- [ ] Not yet implemented. Roadmap target for v0.3.
+
+**Planned Capabilities**
+
+- [ ] `opsone score --case <run-id>` re-scores an existing run without re-collecting evidence.
+- [ ] `opsone score --case latest --with-enrichment` re-scores with enrichment annotations (post-Phase 5).
+
+**Safety Requirements**
+
+- [ ] Scoring is read-only. No system changes.
+- [ ] Findings must not be interpreted as verdicts without additional operator review.
+
+### `enrich`
+
+**Current State**
+
+- [ ] Not yet implemented. Roadmap target for v0.4.
+
+**Planned Capabilities**
+
+- [ ] `opsone enrich --source virustotal --hash-only` — hash reputation lookup.
+- [ ] `opsone enrich --source abuseipdb` — IP reputation for observed connections.
+
+**Safety Requirements**
+
+- [ ] No external API call without explicit operator invocation.
+- [ ] All lookups logged in artifact bundle.
+- [ ] Missing API key produces clean warning, not crash.
+- [ ] Enrichment results annotate existing findings only; no standalone findings created.
 
 ### `triage`
 
@@ -695,7 +1058,8 @@ Milestone gating rule: `v1.0` GA is gated by completion of `P0` roadmap phases; 
 - [ ] Collector fallback coverage for constrained/legacy environments.
 - [ ] Collector-level diagnostics artifacts.
 - [ ] Deterministic final bundle creation and integrity metadata.
-- [ ] Mature anomaly scoring/heuristics with confidence annotations.
+- [ ] `--score` flag to run heuristic scoring immediately after collection.
+- [ ] `--with-reputation --hash-only` flag for opt-in hash/IP reputation pass.
 
 **Pre-1.0 Maturity Requirements**
 
@@ -815,6 +1179,10 @@ Milestone gating rule: `v1.0` GA is gated by completion of `P0` roadmap phases; 
 - [ ] Redaction presets/workflow.
 - [ ] Provider token budget/profile support.
 - [ ] Explicit share-readiness checklist.
+- [ ] `--include-score` flag to embed structured findings in prompt output.
+- [ ] `--include-enrichment` flag to embed enrichment results in prompt output.
+- [ ] Prompt content must separate confirmed local evidence from enrichment-derived context.
+- [ ] Prompts must not invent findings not present in scoring artifacts.
 
 **Pre-1.0 Maturity Requirements**
 
@@ -833,7 +1201,7 @@ Milestone gating rule: `v1.0` GA is gated by completion of `P0` roadmap phases; 
 - [ ] Context memo, prompt artifact, and review status indicators.
 - [ ] Traceable provider/template/version metadata.
 
-## 6. Safety and Trust Roadmap
+## 7. Safety and Trust Roadmap
 
 ### Evidence Preservation Guarantees
 
@@ -870,11 +1238,24 @@ Milestone gating rule: `v1.0` GA is gated by completion of `P0` roadmap phases; 
 - [ ] Escalation outputs include untrusted-boundary warnings.
 - [ ] Redaction and operator review are required before sharing externally.
 - [ ] No automatic prompt submission to external providers.
+- [ ] Prompts referencing structured findings must not invent evidence not present in artifacts.
+
+### External Enrichment Safety
+
+- [ ] No external API calls by default.
+- [ ] No file or sample uploads by default.
+- [ ] VirusTotal must be hash-only by default; file upload requires explicit flag and confirmation.
+- [ ] Missing API keys must produce clean degraded warnings, not crashes or silent failures.
+- [ ] Enrichment results must be marked as external/unverified in all output artifacts.
+- [ ] External enrichment can annotate or adjust confidence only when a local finding already exists. It must not create standalone security findings by itself.
+- [ ] All external lookups must be logged in the artifact bundle.
+- [ ] Redaction required before sharing enrichment artifacts with third parties.
 
 ### Local-Only Defaults
 
 - [ ] Default operation remains local with no network dependency for core workflows.
 - [ ] Any optional external integration remains opt-in and explicit.
+- [ ] Offline KB bundles are local data files, not fetched at runtime.
 
 ### Telemetry Stance
 
@@ -892,13 +1273,26 @@ Milestone gating rule: `v1.0` GA is gated by completion of `P0` roadmap phases; 
 - [ ] Add explicit review checklist artifact to escalation bundles.
 - [ ] Require operator acknowledgement state before marking bundle share-ready.
 
-## 7. Artifact and Output Contract Roadmap
+## 8. Artifact and Output Contract Roadmap
 
 ### Stable Artifact Schemas
 
 - [ ] Replace placeholder schemas with strict, versioned schemas for each core artifact.
 - [ ] Add required/optional fields with compatibility notes.
 - [ ] Validate generated artifacts against schemas in CI.
+
+### Heuristic Finding Schema
+
+- [ ] Define stable JSON schema for finding objects: `finding_id`, `title`, `category`, `severity`, `risk`, `confidence`, `evidence[]`, `rule_id`, `safe_next_steps[]`, optional `safe_command`.
+- [ ] Add findings collection schema: `findings.json` per run with summary metadata (total findings, severity counts, run ID, schema version).
+- [ ] Validate findings against schema in CI.
+- [ ] Define schema extension policy for future finding fields.
+
+### Enrichment Artifact Schema
+
+- [ ] Define schema for enrichment lookup results: `source`, `query_type`, `query_value`, `result`, `timestamp_utc`, `api_latency_ms`.
+- [ ] Define schema for the enrichment log included in artifact bundles.
+- [ ] Validate enrichment artifacts against schema in CI.
 
 ### Artifact Manifest Design
 
@@ -936,7 +1330,7 @@ Milestone gating rule: `v1.0` GA is gated by completion of `P0` roadmap phases; 
 - [ ] Keep machine artifacts structured (JSON/CSV) with stable schemas.
 - [ ] Ensure both views reference the same run metadata.
 
-## 8. Packaging and Distribution Roadmap
+## 9. Packaging and Distribution Roadmap
 
 ### Stage A: Repo Script Usage (Current)
 
@@ -983,7 +1377,7 @@ Milestone gating rule: `v1.0` GA is gated by completion of `P0` roadmap phases; 
 
 - [ ] Lowest operator friction; highest ongoing release discipline and compatibility maintenance required.
 
-## 9. Testing and Quality-Gate Roadmap
+## 10. Testing and Quality-Gate Roadmap
 
 ### Unit Tests
 
@@ -995,15 +1389,40 @@ Milestone gating rule: `v1.0` GA is gated by completion of `P0` roadmap phases; 
 - [ ] Add command integration tests for all commands with representative option sets.
 - [ ] Validate run directory structure and artifact presence rules.
 
+### Heuristic Engine Tests
+
+- [ ] Rule parsing tests — valid and invalid rule schema validation.
+- [ ] Scoring threshold tests — risk/confidence boundary values and edge cases.
+- [ ] Risk/confidence calculation tests — multi-evidence aggregation.
+- [ ] Missing collector data tests — partial evidence produces valid degraded findings, not crashes.
+- [ ] No-mutation tests — scoring engine verifiably makes no system state changes.
+- [ ] Golden findings tests — stable rule set produces deterministic findings from fixture artifacts.
+
+### Enrichment Tests
+
+- [ ] External enrichment failure tests — API timeout, HTTP error, malformed response.
+- [ ] Missing API key tests — clean warning output, no crash, no empty findings.
+- [ ] No-network mode tests — offline KB loads correctly, online enrichment skipped with warning.
+- [ ] Hash-only mode tests — no file content transmitted in VirusTotal path.
+- [ ] Enrichment annotation tests — enrichment adjusts confidence on existing findings only; no standalone findings created.
+- [ ] Lookup log tests — all external calls appear in artifact bundle log.
+
 ### Golden Output Tests
 
 - [ ] Add golden fixtures for incident summary and provider prompt render outputs.
 - [ ] Add change-review process for golden fixture updates.
 
-### Contract/Schema Tests
+### Contract / Schema Tests
 
 - [ ] Validate `result.json` contract version and required fields.
 - [ ] Validate produced artifacts against JSON schemas.
+- [ ] Validate finding schema fields and version.
+
+### Prompt Generation Tests
+
+- [ ] Prompt generation from structured findings — prompt references finding IDs and evidence sources.
+- [ ] No-findings prompt — graceful handling when scoring produces zero findings.
+- [ ] Finding-grounded prompt — prompts must not contain evidence not present in findings artifacts.
 
 ### Command Smoke Tests
 
@@ -1025,18 +1444,23 @@ Milestone gating rule: `v1.0` GA is gated by completion of `P0` roadmap phases; 
 - [ ] Maintain regression suite for fixed bugs and safety incidents.
 - [ ] Require regression pass for release candidates and hotfixes.
 
-## 10. Documentation Roadmap
+## 11. Documentation Roadmap
 
 ### Required 1.0 Documentation Set
 
 - [ ] Architecture documentation (`docs/architecture.md`) updated to final design.
-- [ ] Commands reference (`docs/commands.md`) updated with mature behaviors and outputs.
+- [ ] Commands reference (`docs/commands.md`) updated with mature behaviors and outputs including `doctor`, `score`, `enrich`.
 - [ ] Module specification (`docs/module-spec.md`) updated with stable contracts.
-- [ ] Prompt system docs (`docs/prompts.md`) updated with versioning/redaction/token guidance.
-- [ ] Troubleshooting guide (`docs/troubleshooting.md`) expanded for real failure paths.
+- [ ] Prompt system docs (`docs/prompts.md`) updated with versioning/redaction/token guidance and finding-grounded prompt requirements.
+- [ ] Troubleshooting guide (`docs/troubleshooting.md`) expanded for real failure paths: collector failures, privilege variance, enrichment API failures, missing API keys.
 - [ ] Safety model (`docs/safety-model.md`) finalized for 1.0 guarantees and limits.
+- [ ] Heuristic scoring model doc (`docs/scoring-model.md`) — risk/confidence semantics, severity definitions, risk vs confidence distinction.
+- [ ] Rule authoring guide (`docs/rule-authoring.md`) — rule schema, categories, testing new rules.
+- [ ] Enrichment privacy model doc (`docs/enrichment-privacy.md`) — what is sent, to whom, when, and how to audit the lookup log.
+- [ ] LLM escalation boundaries doc — what prompts contain, what they must not invent, operator review requirements.
+- [ ] Example doctor workflow doc — step-by-step: `doctor` → review findings → `repair --dry-run` → `escalate --include-score`.
 - [ ] FAQ document added for operator adoption and expectation management.
-- [ ] Operator playbooks added for triage/tune/repair/security/escalation workflows.
+- [ ] Operator playbooks added for triage-first, doctor, and repair/escalation workflows.
 - [ ] Release process documentation added (build, sign, verify, publish, rollback).
 - [ ] Trust model documentation added (assurance boundaries, anti-goals, verification path).
 - [ ] Contribution guidance kept aligned (`CONTRIBUTING.md`, `AGENTS.md`).
@@ -1046,8 +1470,9 @@ Milestone gating rule: `v1.0` GA is gated by completion of `P0` roadmap phases; 
 - [ ] Every command or contract change updates relevant docs in same change set.
 - [ ] TODO markers remain explicit when behavior is intentionally incomplete.
 - [ ] Docs must not claim AV/EDR equivalence or autonomous remediation behavior.
+- [ ] Docs must not claim enrichment produces independent verdicts.
 
-## 11. Risks, Constraints, and Anti-Goals
+## 12. Risks, Constraints, and Anti-Goals
 
 ### Risks and Constraints
 
@@ -1056,18 +1481,25 @@ Milestone gating rule: `v1.0` GA is gated by completion of `P0` roadmap phases; 
 - [ ] Admin privilege variance can block data collection and repair pathways.
 - [ ] Defender module availability may vary by policy/edition/environment.
 - [ ] False confidence risk if heuristic summaries are interpreted as definitive diagnosis.
+- [ ] False confidence risk if enrichment annotations are treated as ground truth.
 - [ ] Unsafe automation pressure may push for silent mutation behavior.
 - [ ] Multi-stack maintenance burden (PowerShell + Go helper + desktop shell) can reduce quality.
 - [ ] Legal/privacy risk in external escalation if redaction/review is weak.
+- [ ] API rate limits and key management complexity for online enrichment.
 
 ### Anti-Goals
 
-- [ ] Do not implement antivirus-style malware engine claims.
-- [ ] Do not position product as EDR/SIEM replacement.
-- [ ] Do not introduce remote endpoint orchestration in 1.0 baseline.
-- [ ] Do not allow hidden or autonomous state changes.
+- [ ] Do not implement antivirus-style malware engine or signature scanner.
+- [ ] Do not position product as EDR, SIEM, or AV replacement.
+- [ ] Do not introduce remote endpoint orchestration or command-and-control behavior.
+- [ ] Do not allow hidden or autonomous state changes — operator must confirm all mutations.
+- [ ] Do not issue malware verdicts without traceable local evidence supporting the finding.
+- [ ] Do not upload files or samples to external services by default — require explicit flag and confirmation.
+- [ ] Do not transmit evidence, artifacts, or enrichment data externally by default.
+- [ ] Do not generate AI-based findings without local evidence references — prompts must not invent evidence.
+- [ ] Do not turn external reputation into an automated verdict engine.
 
-## 12. 1.0 Measurable Success Criteria
+## 13. 1.0 Measurable Success Criteria
 
 - [ ] Reproducible triage runs produce stable artifact sets and deterministic bundle manifests.
 - [ ] Stable output contract version with compatibility policy and migration guidance exists.
@@ -1076,11 +1508,18 @@ Milestone gating rule: `v1.0` GA is gated by completion of `P0` roadmap phases; 
 - [ ] Installation/update path is documented and validated for supported Windows baseline.
 - [ ] Operators can understand what happened, what changed, and what remains uncertain from outputs.
 - [ ] Release process produces signed, verifiable artifacts with explicit trust instructions.
+- [ ] Heuristic engine produces deterministic, explainable findings from stable triage artifacts.
+- [ ] All findings include traceable evidence source, rule ID, risk, confidence, and safe next steps.
+- [ ] External enrichment is disabled by default and requires explicit operator action to enable.
+- [ ] `opsone doctor` runs end-to-end without network access and produces health summary + escalation package.
+- [ ] No external data transmission occurs without explicit operator action and confirmation.
 
-## 13. Post-1.0 Considerations
+## 14. Post-1.0 Considerations
 
 - [ ] Evaluate carefully bounded feature additions against trust model and anti-goals.
 - [ ] Consider optional integrations only with explicit opt-in and documented risk boundaries.
 - [ ] Maintain compatibility and deprecation policy discipline across 1.x releases.
 - [ ] Expand playbooks/test coverage based on real operator feedback and incident learnings.
 - [ ] Periodically re-audit safety model, privilege handling, and escalation privacy controls.
+- [ ] Evaluate additional enrichment sources only with the same opt-in and safety model applied to v1.0 sources.
+- [ ] Consider sample upload support only with multi-step confirmation, explicit flag, audit log, and post-1.0 governance review.
